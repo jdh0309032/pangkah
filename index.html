@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pangkah! - Modular Edition</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+</head>
+<body>
+
+    <!-- Lobby Screen -->
+    <div id="lobby-screen">
+        <div class="lobby-left">
+            <h1>Pangkah!</h1>
+            <p>3D Multiplayer Spinning Top Arena</p>
+            
+            <div class="lobby-btn-group">
+                <input type="text" id="nickname-input" value="Player1" placeholder="Enter Nickname">
+                <button class="action-btn" onclick="openCustomModal()">⚙️ CUSTOMIZE TOP</button>
+                <button class="action-btn play" onclick="startQuickGame()">🌐 QUICK ARENA</button>
+                <button class="action-btn sub" onclick="openMultiplayerModal()">👥 PRIVATE ROOM</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Modal Popup -->
+    <div id="custom-modal" class="modal">
+        <div class="modal-content">
+            <h2>Customize Your Top</h2>
+            
+            <div class="modal-showroom-frame" id="showroom-frame">
+                <div id="showroom-container"></div>
+            </div>
+
+            <label>Blade Type</label>
+            <select id="select-blade" onchange="updateShowroom()">
+                <option value="circle">Balance</option>
+                <option value="saw">Attack</option>
+                <option value="shield">Defense</option>
+            </select>
+
+            <label>Tip Type</label>
+            <select id="select-tip" onchange="updateShowroom()">
+                <option value="speed">Speed</option>
+                <option value="heavy">Heavy</option>
+            </select>
+
+            <label>Zodiac Bit Chip</label>
+            <select id="select-zodiac" onchange="updateShowroom()">
+                <option value="rat">Rat (Zi)</option>
+                <option value="ox">Ox (Chou)</option>
+                <option value="tiger">Tiger (Yin)</option>
+                <option value="rabbit">Rabbit (Mao)</option>
+                <option value="dragon">Dragon (Chen)</option>
+                <option value="snake">Snake (Si)</option>
+                <option value="horse">Horse (Wu)</option>
+                <option value="goat">Goat (Wei)</option>
+                <option value="monkey">Monkey (Shen)</option>
+                <option value="rooster">Rooster (You)</option>
+                <option value="dog">Dog (Xu)</option>
+                <option value="pig">Pig (Hai)</option>
+            </select>
+
+            <label>Colors</label>
+            <div class="color-row" style="display:flex; gap:6px;">
+                <div style="flex:1;">
+                    <span style="font-size:10px; color:#94a3b8;">Blade 1</span>
+                    <input type="color" id="blade-color-1" value="#3b82f6" onchange="updateShowroom()">
+                </div>
+                <div style="flex:1;">
+                    <span style="font-size:10px; color:#94a3b8;">Blade 2</span>
+                    <input type="color" id="blade-color-2" value="#1d4ed8" onchange="updateShowroom()">
+                </div>
+                <div style="flex:1;">
+                    <span style="font-size:10px; color:#94a3b8;">Core (Glass)</span>
+                    <input type="color" id="core-color" value="#f59e0b" onchange="updateShowroom()">
+                </div>
+            </div>
+
+            <button class="action-btn play" style="margin-top:15px;" onclick="closeCustomModal()">DONE</button>
+        </div>
+    </div>
+
+    <!-- Multiplayer Room Modal -->
+    <div id="multiplayer-modal" class="modal">
+        <div class="modal-content">
+            <h2>Private Room</h2>
+            <div id="room-menu-view">
+                <button class="action-btn sub" style="margin-bottom:10px;" onclick="createRoom()">🏠 CREATE ROOM</button>
+                <div style="font-size:12px; color:#94a3b8; margin: 10px 0 5px 0; text-align:center;">OR ENTER 4-DIGIT CODE</div>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="room-code-input" maxlength="4" placeholder="Code" style="flex:1; padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:8px; text-align:center; font-size:16px; font-weight:bold; letter-spacing:2px; outline:none;">
+                    <button class="action-btn play" style="width:100px; padding:10px;" onclick="joinRoom()">JOIN</button>
+                </div>
+                <button class="action-btn" style="margin-top:15px; background:#475569;" onclick="closeMultiplayerModal()">BACK</button>
+            </div>
+
+            <div id="room-waiting-view">
+                <div style="text-align:center; margin-bottom:6px;">
+                    <span style="font-size:11px; color:#94a3b8;">ROOM CODE</span>
+                    <div id="display-room-code" style="font-size:24px; font-weight:900; color:#38bdf8; letter-spacing:2px;">----</div>
+                </div>
+                <label>Players in Room (<span id="player-count">1</span>)</label>
+                <div id="room-player-list"></div>
+
+                <button class="action-btn sub" style="margin:8px 0; padding:10px; font-size:12px;" onclick="addBotToPrivateRoom()">+ ADD BOT</button>
+
+                <label style="margin-top:4px;">Room Chat</label>
+                <div id="room-chat-container">
+                    <div id="chat-messages"></div>
+                    <div style="display:flex; gap:4px; margin-top:4px;">
+                        <input type="text" id="chat-input" placeholder="Say something..." onkeydown="if(event.key==='Enter') sendChatMessage()">
+                        <button onclick="sendChatMessage()">SEND</button>
+                    </div>
+                </div>
+
+                <button id="room-start-btn" class="action-btn play" style="margin-top:8px;" onclick="startPrivateGameSession()">START GAME</button>
+                <button class="action-btn" style="background:#475569; margin-top:6px;" onclick="leaveRoom()">LEAVE ROOM</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Result Modal -->
+    <div id="result-modal" class="modal">
+        <div class="modal-content">
+            <h2>🏁 BATTLE RESULTS</h2>
+            
+            <div id="result-room-info" style="display:none; text-align:center; margin-bottom:6px; width:100%;">
+                <span style="font-size:10px; color:#94a3b8;">ROOM CODE</span>
+                <div id="result-room-code" style="font-size:18px; font-weight:900; color:#38bdf8; letter-spacing:2px;">----</div>
+            </div>
+
+            <div id="result-rank-list"></div>
+
+            <div id="result-chat-box" style="display:none; width:100%; background:#1e293b; border-radius:8px; padding:6px; height:90px; flex-direction:column; box-sizing:border-box; margin-bottom:10px;">
+                <div id="result-chat-messages" style="flex:1; overflow-y:auto; font-size:11px; color:#cbd5e1; display:flex; flex-direction:column; gap:3px;"></div>
+                <div style="display:flex; gap:4px; margin-top:4px;">
+                    <input type="text" id="result-chat-input" placeholder="Chat with room..." onkeydown="if(event.key==='Enter') sendResultChatMessage()" style="flex:1; padding:4px; background:#0f172a; color:white; border:1px solid #334155; border-radius:4px; font-size:11px; outline:none;">
+                    <button onclick="sendResultChatMessage()" style="padding:4px 8px; background:#3b82f6; color:white; border:none; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;">SEND</button>
+                </div>
+            </div>
+
+            <button class="action-btn play" onclick="restartCurrentGame()">REPLAY</button>
+            <button class="action-btn sub" style="margin-top:8px;" onclick="returnToLobby()">LOBBY</button>
+        </div>
+    </div>
+
+    <!-- In-game UI -->
+    <div id="game-ui">
+        <button id="exit-btn" onclick="returnToLobby()">🏠 EXIT</button>
+        <div id="status-text">Knock opponents out of the arena!</div>
+        
+        <div id="countdown-overlay">
+            <div id="countdown-number">3</div>
+        </div>
+
+        <div id="leaderboard">
+            <h3 id="leaderboard-title">🏆 LEADERBOARD</h3>
+            <div id="rank-list"></div>
+        </div>
+
+        <div id="ingame-chat-log"></div>
+
+        <div id="ingame-chat-box">
+            <div style="display:flex; gap:4px;">
+                <input type="text" id="ingame-chat-input" placeholder="Chat while spectating..." onkeydown="if(event.key==='Enter') sendIngameChatMessage()">
+                <button onclick="sendIngameChatMessage()">SEND</button>
+            </div>
+        </div>
+
+        <div id="joystick-base">
+            <div id="joystick-stick"></div>
+        </div>
+        
+        <div id="dash-btn" onclick="handleActionClick()">
+            <svg class="dash-timer-svg" viewBox="0 0 100 100">
+                <circle class="timer-progress" id="dash-timer-ring" cx="50" cy="50" r="42"></circle>
+            </svg>
+            <div id="dash-icon-mask" style="width: 44px; height: 44px; display: none;"></div>
+            <div id="dash-text-content">DASH</div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>

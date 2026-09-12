@@ -1,0 +1,120 @@
+1. 공통 기준 (Coordinate System & Scale)
+좌표계 (Blender): Y-up 기준 (Export 시 +Y Up 체크 필수)
+
+스케일 비율: 블렌더 1유닛(1m) = 게임 내 50배 확대 적용 (model.scale.set(50, 50, 50))
+
+원점 (Origin): 모든 오브젝트의 중심축은 회전 중심인 (0, 0, 0)에 위치해야 함
+
+2. 블레이드 (Blade) 모델링 가이드
+사이즈 규격 (Max / Min):
+
+최대 크기 (Max): 지름 0.6m (반경 0.3m), 높이 0.15m (보내주신 가이드 기준)
+
+최소 크기 (Min): 지름 0.5m (반경 0.25m), 높이 0.1m
+
+텍스처 / 머티리얼 네이밍 규칙 (컬러 커스텀 연동용):
+
+메인 색상 적용 영역 머티리얼 이름: Blade_Main_Mat (게임 내 Blade 1 색상과 연동)
+
+포인트/서브 색상 적용 영역 머티리얼 이름: Blade_Accent_Mat (게임 내 Blade 2 색상과 연동)
+
+파일 형식 및 저장 경로:
+
+형식: .glb (Binary glTF, 텍스처 패킹 필수)
+
+저장 경로 및 파일명:
+
+밸런스형: assets/models/custom_balance.glb
+
+공격형: assets/models/custom_attack.glb
+
+방어형: assets/models/custom_defense.glb
+
+3. 코어 (Core) 모델링 가이드
+사이즈 규격:
+
+지름 약 0.28m (반경 0.14m), 높이 약 0.2m (블레이드 정중앙 홈에 쏙 들어오는 크기)
+
+재질 설정:
+
+코어는 투명한 유리 재질(Glass Material)로 자동 적용되며, 커스텀 탭에서 고른 색상으로 틴팅(색상 투과)됨
+
+파일 형식 및 저장 경로:
+
+형식: .glb
+
+파일명: assets/models/custom_core.glb (※ 파일이 없으면 기본 보석 기둥 모양으로 대체됩니다)
+
+4. 12간지 로고 (Zodiac Bit Chip) 이미지 가이드
+이미지 규격:
+
+해상도: 128 x 128 px (정방형 권장)
+
+파일 포맷: .png (배경이 없는 투명 이미지 필수)
+
+파일명 규칙 (소문자 영단어 고정):
+
+쥐: rat.png
+
+소: ox.png
+
+호랑이: tiger.png
+
+토끼: rabbit.png
+
+용: dragon.png
+
+뱀: snake.png
+
+말: horse.png
+
+양: goat.png
+
+원숭이: monkey.png
+
+닭: rooster.png
+
+개: dog.png
+
+돼지: pig.png
+
+저장 경로:
+
+assets/textures/zodiac/ 폴더 아래에 각각 저장
+
+5. 아레나 (Arena / 경기장) 가이드
+아레나 반경: 게임 내 시스템 기준 반지름 300 유닛
+
+외곽 벽 크기: 반경 300 ~ 335 유닛 구간에 원형 배리어/벽 구조물 위치
+
+6. 최종 폴더링 구조 (Directory Tree)
+프로젝트 루트 폴더를 기준으로 아래와 같이 폴더를 유지해 주세요.
+
+Plaintext
+Pangkah/
+│
+├── index.html
+├── style.css
+├── game.js
+│
+└── assets/
+    ├── models/
+    │   ├── custom_balance.glb
+    │   ├── custom_attack.glb
+    │   ├── custom_defense.glb
+    │   └── custom_core.glb (선택)
+    │
+    └── textures/
+        └── zodiac/
+            ├── rat.png
+            ├── ox.png
+            ├── tiger.png
+            ├── rabbit.png
+            ├── dragon.png
+            ├── snake.png
+            ├── horse.png
+            ├── goat.png
+            ├── monkey.png
+            ├── rooster.png
+            ├── dog.png
+            └── pig.png
