@@ -1,4 +1,4 @@
-// 🔥 본인의 Firebase 설정 정보를 입력해주세요!
+// 🔥 본인의 Firebase 설정 정보를 입력해주세요! (단 한 번만 선언)
 const firebaseConfig = {
     apiKey: "AIzaSyCStXmToMtsIBl6cgWqKK1py40CUwYVCH4",
     authDomain: "pangkah-4ce6e.firebaseapp.com",
@@ -17,7 +17,7 @@ const db = firebase.database();
 let roomRef = null;
 let myPlayerIndex = 0;
 
-// 💡 함수 선언과 동시에 전역(window)에 등록하여 에러 방지
+// 모달 및 UI 관련 전역 함수 등록
 window.openCustomModal = function() {
     document.getElementById('custom-modal').style.display = 'flex';
 };
