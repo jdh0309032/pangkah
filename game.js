@@ -1587,7 +1587,6 @@ function showResults() {
     let resultChatBox = document.getElementById('result-chat-box');
     let resultRoomCode = document.getElementById('result-room-code');
 
-    // 💡 누락되었던 if 문 정상 복구
     if (gameMode === 'private') {
         if (resultRoomInfo) resultRoomInfo.style.display = 'block';
         if (resultChatBox) resultChatBox.style.display = 'flex';
@@ -1606,5 +1605,22 @@ window.addEventListener('resize', () => {
     gameCam.updateProjectionMatrix();
     gameRenderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+// 💡 HTML의 onclick 속성에서 함수를 인식할 수 있도록 전역 객체에 명시적 등록
+window.openCustomModal = openCustomModal;
+window.closeCustomModal = closeCustomModal;
+window.openMultiplayerModal = openMultiplayerModal;
+window.closeMultiplayerModal = closeMultiplayerModal;
+window.createRoom = createRoom;
+window.joinRoom = joinRoom;
+window.leaveRoom = leaveRoom;
+window.addBotToPrivateRoom = addBotToPrivateRoom;
+window.startPrivateGameSession = startPrivateGameSession;
+window.startQuickGame = startQuickGame;
+window.sendChatMessage = sendChatMessage;
+window.sendIngameChatMessage = sendIngameChatMessage;
+window.sendResultChatMessage = sendResultChatMessage;
+window.restartCurrentGame = restartCurrentGame;
+window.returnToLobby = returnToLobby;
 
 gameLoop();
