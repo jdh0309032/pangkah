@@ -372,7 +372,6 @@ function startGameSession(playerList, mode) {
 
     entities = [];
     
-    // 안전한 메모리 정리 처리 (null 예외 방지)
     entityMeshes.forEach(m => { if (m) beybladeScene.remove(m); });
     entityMeshes = [];
     
@@ -635,10 +634,11 @@ function createBeybladeMesh(bladeType, tipType, zodiacType, bladeCol1, bladeCol2
             alphaTest: 0.1              
         });
 
+        // 💡 십이지신 로고 정방향 출력 수정 (rotation = 0)
         createColorizedZodiacTexture(zodiacType, visibleIconColor, (tex) => {
             if (tex) {
                 tex.center.set(0.5, 0.5);
-                tex.rotation = Math.PI; 
+                tex.rotation = 0; 
                 bitMat.map = tex;
                 bitMat.needsUpdate = true;
             }
@@ -866,6 +866,15 @@ window.addEventListener('pointerup', (e) => {
     inputDirX = 0; inputDirZ = 0;
     joystickBase.style.display = 'none';
 });
+
+// 💡 모바일에서 조이스틱을 움직이는 중에도 대시 버튼이 즉시 눌리도록 멀티터치 보완
+const dashBtnElem = document.getElementById('dash-btn');
+if (dashBtnElem) {
+    dashBtnElem.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        handleActionClick();
+    });
+}
 
 function triggerDash() {
     if (!gameStarted || gamePhase !== 'playing' || !player || !player.isAlive || player.isDashing || player.isStunned || player.isCooldown) return;
