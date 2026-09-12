@@ -1587,6 +1587,7 @@ function showResults() {
     let resultChatBox = document.getElementById('result-chat-box');
     let resultRoomCode = document.getElementById('result-room-code');
 
+    // 💡 누락되었던 if 문 정상 복구
     if (gameMode === 'private') {
         if (resultRoomInfo) resultRoomInfo.style.display = 'block';
         if (resultChatBox) resultChatBox.style.display = 'flex';
