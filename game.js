@@ -1,3 +1,20 @@
+// 🔥 본인의 Firebase 설정 정보를 아래에 입력해주세요!
+const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_AUTH_DOMAIN",
+    databaseURL: "YOUR_DATABASE_URL",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_STORAGE_BUCKET",
+    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+    appId: "YOUR_APP_ID"
+};
+
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+const db = firebase.database();
+let roomRef = null;
+
 function openCustomModal() {
     document.getElementById('custom-modal').style.display = 'flex';
 }
@@ -27,8 +44,27 @@ function createRoom() {
     
     let nickname = document.getElementById('nickname-input').value || 'Player1';
     roomPlayers = [{ name: nickname, isHost: true }];
-    updateRoomPlayerList();
     
+    roomRef = db.ref('rooms/' + currentRoomCode);
+    roomRef.set({
+        status: 'waiting',
+        players: roomPlayers
+    });
+
+    roomRef.on('value', (snapshot) => {
+        let data = snapshot.val();
+        if (!data) return;
+        if (data.players) {
+            roomPlayers = data.players;
+            updateRoomPlayerList();
+        }
+        if (data.status === 'playing' && gamePhase === 'waiting') {
+            closeMultiplayerModal();
+            startGameSession(roomPlayers, 'private');
+        }
+    });
+
+    updateRoomPlayerList();
     clearPrivateChat();
     addChatSystemMessage(`Room created! Code: ${currentRoomCode}`);
 }
@@ -46,18 +82,57 @@ function joinRoom() {
     document.getElementById('room-waiting-view').style.display = 'flex';
 
     let nickname = document.getElementById('nickname-input').value || 'Player1';
-    roomPlayers = [
-        { name: 'HostMaster', isHost: true },
-        { name: nickname, isHost: false }
-    ];
-    updateRoomPlayerList();
-    
-    clearPrivateChat();
-    addChatSystemMessage(`Joined room ${currentRoomCode}`);
+    roomRef = db.ref('rooms/' + currentRoomCode);
+
+    roomRef.once('value', (snapshot) => {
+        let data = snapshot.val();
+        if (!data) {
+            alert('존재하지 않는 방 코드입니다!');
+            leaveRoom();
+            return;
+        }
+        roomPlayers = data.players || [];
+        if (!roomPlayers.some(p => p.name === nickname)) {
+            roomPlayers.push({ name: nickname, isHost: false });
+            roomRef.update({ players: roomPlayers });
+        }
+
+        roomRef.on('value', (snap) => {
+            let d = snap.val();
+            if (!d) return;
+            if (d.players) {
+                roomPlayers = d.players;
+                updateRoomPlayerList();
+            }
+            if (d.status === 'playing' && gamePhase === 'waiting') {
+                closeMultiplayerModal();
+                startGameSession(roomPlayers, 'private');
+            }
+        });
+
+        updateRoomPlayerList();
+        clearPrivateChat();
+        addChatSystemMessage(`Joined room ${currentRoomCode}`);
+    });
 }
 
 function leaveRoom() {
+    if (roomRef) {
+        roomRef.off();
+        if (!isHost) {
+            let nickname = document.getElementById('nickname-input').value || 'Player1';
+            roomRef.once('value', (snap) => {
+                let data = snap.val();
+                if (data && data.players) {
+                    let updatedPlayers = data.players.filter(p => p.name !== nickname);
+                    roomRef.update({ players: updatedPlayers });
+                }
+            });
+        }
+    }
     currentRoomCode = '';
+    roomRef = null;
+    isHost = false;
     clearPrivateChat();
     document.getElementById('room-waiting-view').style.display = 'none';
     document.getElementById('room-menu-view').style.display = 'block';
@@ -76,9 +151,17 @@ function updateRoomPlayerList() {
 }
 
 function addBotToPrivateRoom() {
+    if (!isHost) {
+        alert('방장만 봇을 추가할 수 있습니다!');
+        return;
+    }
     let botNames = ['BladeKing', 'SpinMaster', 'NoobSlayer', 'TornadoX', 'IronSpins'];
     let bName = botNames[roomPlayers.length % botNames.length] + (roomPlayers.length + 1);
     roomPlayers.push({ name: bName, isHost: false, isBot: true });
+    
+    if (roomRef) {
+        roomRef.update({ players: roomPlayers });
+    }
     updateRoomPlayerList();
     addChatSystemMessage(`Added bot: ${bName}`);
 }
@@ -157,25 +240,26 @@ function clearPrivateChat() {
 }
 
 function startPrivateGameSession() {
+    if (!isHost) {
+        alert('방장만 게임을 시작할 수 있습니다!');
+        return;
+    }
     if (!roomPlayers || roomPlayers.length <= 0) {
-        let nickname = document.getElementById('nickname-input').value || 'Player1';
-        roomPlayers = [
-            { name: nickname, isHost: true },
-            { name: 'BladeKing', isHost: false, isBot: true },
-            { name: 'SpinMaster', isHost: false, isBot: true }
-        ];
+        alert('참가자나 봇이 최소 1명 이상 있어야 시작할 수 있습니다!');
+        return;
+    }
+    if (roomRef) {
+        roomRef.update({ status: 'playing' });
     }
     closeMultiplayerModal();
     startGameSession(roomPlayers, 'private');
 }
 
+// 💡 자유 게임방(Quick Game)에서 봇 3명 제거 (플레이어 혼자 서바이벌)
 function startQuickGame() {
     let nickname = document.getElementById('nickname-input').value || 'Player1';
     let quickPlayers = [
-        { name: nickname, isHost: true },
-        { name: 'BladeKing', isHost: false },
-        { name: 'SpinMaster', isHost: false },
-        { name: 'NoobSlayer', isHost: false }
+        { name: nickname, isHost: true }
     ];
     startGameSession(quickPlayers, 'quick');
 }
@@ -457,9 +541,7 @@ function restartCurrentGame() {
         if (!roomPlayers || roomPlayers.length === 0) {
             let nickname = document.getElementById('nickname-input').value || 'Player1';
             roomPlayers = [
-                { name: nickname, isHost: true },
-                { name: 'BladeKing', isHost: false, isBot: true },
-                { name: 'SpinMaster', isHost: false, isBot: true }
+                { name: nickname, isHost: true }
             ];
         }
         startPrivateGameSession();
@@ -634,7 +716,6 @@ function createBeybladeMesh(bladeType, tipType, zodiacType, bladeCol1, bladeCol2
             alphaTest: 0.1              
         });
 
-        // 💡 십이지신 로고 정방향 출력 수정 (rotation = 0)
         createColorizedZodiacTexture(zodiacType, visibleIconColor, (tex) => {
             if (tex) {
                 tex.center.set(0.5, 0.5);
@@ -867,7 +948,6 @@ window.addEventListener('pointerup', (e) => {
     joystickBase.style.display = 'none';
 });
 
-// 💡 모바일에서 조이스틱을 움직이는 중에도 대시 버튼이 즉시 눌리도록 멀티터치 보완
 const dashBtnElem = document.getElementById('dash-btn');
 if (dashBtnElem) {
     dashBtnElem.addEventListener('pointerdown', (e) => {
