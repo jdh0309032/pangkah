@@ -1,5 +1,7 @@
+// index.html에서 이미 Firebase가 초기화되었으므로 바로 database를 연결합니다.
 const db = firebase.database();
 let roomRef = null;
+let publicRoomRef = null;
 let myPlayerIndex = 0;
 
 // 모달 및 UI 관련 전역 함수 등록
@@ -46,12 +48,15 @@ window.createRoom = function() {
             roomPlayers = data.players;
             updateRoomPlayerList();
         }
-        if (data.status === 'playing' && gamePhase === 'waiting') {
+        if (data.status === 'playing' && (gamePhase === 'waiting' || gamePhase === 'gameover')) {
             closeMultiplayerModal();
+            let resModal = document.getElementById('result-modal');
+            if (resModal) resModal.style.display = 'none';
             startGameSession(roomPlayers, 'private');
         }
     });
 
+    initPrivateChatListener();
     updateRoomPlayerList();
     clearPrivateChat();
     addChatSystemMessage(`Room created! Code: ${currentRoomCode}`);
@@ -101,12 +106,15 @@ window.joinRoom = function() {
                 roomPlayers = d.players;
                 updateRoomPlayerList();
             }
-            if (d.status === 'playing' && gamePhase === 'waiting') {
+            if (d.status === 'playing' && (gamePhase === 'waiting' || gamePhase === 'gameover')) {
                 closeMultiplayerModal();
+                let resModal = document.getElementById('result-modal');
+                if (resModal) resModal.style.display = 'none';
                 startGameSession(roomPlayers, 'private');
             }
         });
 
+        initPrivateChatListener();
         updateRoomPlayerList();
         clearPrivateChat();
         addChatSystemMessage(`Joined room ${currentRoomCode}`);
@@ -188,15 +196,10 @@ window.sendChatMessage = function() {
     if (!text) return;
     let nickname = document.getElementById('nickname-input').value || 'Player1';
     
-    let cm = document.getElementById('chat-messages');
-    if (cm) {
-        cm.innerHTML += `<div><span style="color:#f1c40f; font-weight:bold;">${nickname}:</span> ${text}</div>`;
-        cm.scrollTop = cm.scrollHeight;
+    if (roomRef) {
+        roomRef.child('chat').push({ sender: nickname, text: text });
     }
     input.value = '';
-    
-    appendIngameChatLog(nickname, text);
-    appendResultChatLog(nickname, text);
 };
 
 window.sendIngameChatMessage = function() {
@@ -206,7 +209,9 @@ window.sendIngameChatMessage = function() {
     if (!text) return;
     let nickname = document.getElementById('nickname-input').value || 'Player1';
     
-    appendIngameChatLog(nickname, text);
+    if (roomRef) {
+        roomRef.child('chat').push({ sender: nickname, text: text });
+    }
     input.value = '';
 };
 
@@ -217,9 +222,28 @@ window.sendResultChatMessage = function() {
     if (!text) return;
     let nickname = document.getElementById('nickname-input').value || 'Player1';
     
-    appendResultChatLog(nickname, text);
+    if (roomRef) {
+        roomRef.child('chat').push({ sender: nickname, text: text });
+    }
     input.value = '';
 };
+
+function initPrivateChatListener() {
+    if (!roomRef) return;
+    roomRef.child('chat').off();
+    roomRef.child('chat').on('child_added', (snapshot) => {
+        let data = snapshot.val();
+        if (data) {
+            let cm = document.getElementById('chat-messages');
+            if (cm) {
+                cm.innerHTML += `<div><span style="color:#f1c40f; font-weight:bold;">${data.sender}:</span> ${data.text}</div>`;
+                cm.scrollTop = cm.scrollHeight;
+            }
+            appendIngameChatLog(data.sender, data.text);
+            appendResultChatLog(data.sender, data.text);
+        }
+    });
+}
 
 function appendIngameChatLog(sender, text) {
     let log = document.getElementById('ingame-chat-log');
@@ -262,6 +286,7 @@ window.startPrivateGameSession = function() {
     startGameSession(roomPlayers, 'private');
 };
 
+// 퀵 아레나 오픈월드 멀티플레이 실행
 window.startQuickGame = function() {
     let nickname = document.getElementById('nickname-input').value || 'Player1';
     gameMode = 'quick';
@@ -284,7 +309,6 @@ window.startQuickGame = function() {
         let data = snapshot.val();
         let pList = data && data.players ? data.players : [];
 
-        // 중복 닉네임 방지 및 목록에 추가
         pList = pList.filter(p => p.name !== nickname);
         pList.push(myData);
 
@@ -296,7 +320,6 @@ window.startQuickGame = function() {
         roomPlayers = pList;
         myPlayerIndex = pList.length - 1;
 
-        // 실시간 플레이어 입장/퇴장 동기화
         publicRoomRef.child('players').on('value', (snap) => {
             let updatedPlayers = snap.val();
             if (updatedPlayers) {
@@ -304,7 +327,6 @@ window.startQuickGame = function() {
             }
         });
 
-        // 퀵 아레나 실시간 위치 동기화
         publicRoomRef.child('gameStates').on('value', (snapshot) => {
             let states = snapshot.val();
             if (!states) return;
@@ -362,7 +384,7 @@ function createColorizedZodiacTexture(sign, hexColor, callback) {
         ctx.fillRect(0, 0, 256, 256);
         
         let texture = new THREE.CanvasTexture(canvas);
-        texture.encoding = THREE.sRGBEncoding;
+        texture.colorSpace = THREE.SRGBColorSpace;
         zodiacCanvasTextureCache[cacheKey] = texture;
         callback(texture);
     };
@@ -394,12 +416,6 @@ const PARTS_STAT = {
     'heavy':  { speedBonus: 0.90, weight: 1.5, glb: 'custom_tip_heavy.glb' }
 };
 
-function getEntityWeight(ent) {
-    let bStat = PARTS_STAT[ent.type] || PARTS_STAT['circle'];
-    let tStat = PARTS_STAT[ent.tipType] || PARTS_STAT['speed'];
-    return bStat.weight + tStat.weight;
-}
-
 let trailTextureCache = {};
 function getTrailTexture() {
     if (trailTextureCache['default']) return trailTextureCache['default'];
@@ -417,7 +433,7 @@ function getTrailTexture() {
     ctx.fillRect(0, 0, 64, 128);
     
     let tex = new THREE.CanvasTexture(canvas);
-    tex.encoding = THREE.sRGBEncoding;
+    tex.colorSpace = THREE.SRGBColorSpace;
     trailTextureCache['default'] = tex;
     return tex;
 }
@@ -459,7 +475,7 @@ function createEntity(x, y, type, tipType, zodiac, bladeColor1, bladeColor2, cor
         prevX: x, prevY: y,
         name: name, isPlayer: isPlayer,
         isAlive: true, dropHeight: 120, survivalTime: 0,
-        aiState: 'attack', aiTimer: 0
+        targetX: x, targetY: y
     };
 }
 
@@ -563,8 +579,8 @@ function startGameSession(playerList, mode) {
             if (!states) return;
             states.forEach((st, idx) => {
                 if (idx !== myPlayerIndex && entities[idx] && entities[idx].isAlive) {
-                    entities[idx].x = st.x;
-                    entities[idx].y = st.y;
+                    entities[idx].targetX = st.x;
+                    entities[idx].targetY = st.y;
                     entities[idx].vx = st.vx;
                     entities[idx].vz = st.vz;
                     entities[idx].isAlive = st.isAlive;
@@ -586,6 +602,7 @@ window.returnToLobby = function() {
     gameStarted = false;
     gamePhase = 'waiting';
     if (roomRef) roomRef.child('gameStates').off();
+    if (publicRoomRef) publicRoomRef.child('gameStates').off();
     document.getElementById('game-ui').style.display = 'none';
     document.getElementById('result-modal').style.display = 'none';
     let ingameChatLog = document.getElementById('ingame-chat-log');
@@ -606,13 +623,14 @@ window.returnToLobby = function() {
 window.restartCurrentGame = function() {
     document.getElementById('result-modal').style.display = 'none';
     if (gameMode === 'private') {
-        if (!roomPlayers || roomPlayers.length === 0) {
-            let nickname = document.getElementById('nickname-input').value || 'Player1';
-            roomPlayers = [
-                { name: nickname, isHost: true }
-            ];
+        if (isHost) {
+            if (roomRef) {
+                roomRef.update({ status: 'playing' });
+            }
+            startPrivateGameSession();
+        } else {
+            alert('방장만 게임을 다시 시작할 수 있습니다.');
         }
-        startPrivateGameSession();
     } else {
         startQuickGame();
     }
@@ -918,7 +936,7 @@ gltfLoader.load('./assets/models/custom_arena.glb', (gltf) => {
                         textureLoader.load(`./assets/textures/ads/${fileName}`, (tex) => {
                             tex.wrapS = THREE.ClampToEdgeWrapping;
                             tex.wrapT = THREE.ClampToEdgeWrapping;
-                            tex.encoding = THREE.sRGBEncoding;
+                            tex.colorSpace = THREE.SRGBColorSpace;
 
                             tex.center.set(0.5, 0.5);
                             if (mName.includes('center')) {
@@ -957,7 +975,6 @@ gltfLoader.load('./assets/models/custom_arena.glb', (gltf) => {
     });
     gameScene.add(arenaModel);
 }, undefined, (error) => {
-    console.log("custom_arena.glb 로드 실패, 기본 아레나 Fallback 사용");
     const outerWallGeo = new THREE.CylinderGeometry(arenaRadius + 35, arenaRadius + 45, 45, 64);
     const outerWallMat = new THREE.MeshStandardMaterial({ color: '#cbd5e1', metalness: 0.8, roughness: 0.05 });
     const outerWall = new THREE.Mesh(outerWallGeo, outerWallMat);
@@ -1037,13 +1054,13 @@ function triggerDash() {
     player.dashDirZ = (dirZ / len) * 7;
 }
 
-function handleActionClick() {
+window.handleActionClick = function() {
     if (player && !player.isAlive && gameMode === 'private') {
         switchSpectateTarget();
     } else {
         triggerDash();
     }
-}
+};
 
 function switchSpectateTarget() {
     let aliveEntities = entities.filter(e => e.isAlive);
@@ -1156,6 +1173,7 @@ function gameLoop() {
                 entities.forEach((ent, idx) => {
                     if (!ent.isAlive) return;
                     
+                    // 원격 플레이어인 경우 위치 보간 수행 후 로컬 물리 계산 스킵
                     if ((gameMode === 'private' || gameMode === 'quick') && !ent.isPlayer) {
                         if (ent.targetX !== undefined && ent.targetY !== undefined) {
                             ent.prevX = ent.x;
@@ -1228,12 +1246,12 @@ function gameLoop() {
                     ent.y += ent.vz;
                 });
 
-                // gameLoop 내부 아래 코드 부분을 찾아서 수정
-                if ((gameMode === 'private' || gameMode === 'quick') && player && player.isAlive) {
+                // 내 위치 서버 동기화 전송 (프라이빗 & 퀵 모드 공통)
+                if (player && player.isAlive) {
                     netSyncTimer++;
                     if (netSyncTimer >= 5) {
                         netSyncTimer = 0;
-                        let activeRef = gameMode === 'private' ? roomRef : publicRoomRef;
+                        let activeRef = (gameMode === 'private') ? roomRef : publicRoomRef;
                         if (activeRef) {
                             activeRef.child(`gameStates/${myPlayerIndex}`).set({
                                 x: player.x,
@@ -1246,6 +1264,7 @@ function gameLoop() {
                     }
                 }
 
+                // 팽이 간 충돌 판정 및 상호작용
                 for (let i = 0; i < entities.length; i++) {
                     for (let j = i + 1; j < entities.length; j++) {
                         let e1 = entities[i];
@@ -1272,6 +1291,7 @@ function gameLoop() {
                     }
                 }
 
+                // 아레나 밖 이탈 처리
                 entities.forEach((ent, i) => {
                     if (!ent.isAlive) return;
                     let dCenter = Math.sqrt(ent.x * ent.x + ent.y * ent.y);
@@ -1281,7 +1301,6 @@ function gameLoop() {
                                 ent.x = 0; ent.y = 120; ent.vx = 0; ent.vz = 0;
                                 survivalTime = 0; 
                                 ent.survivalTime = 0;
-                                
                                 ent.isDashing = false;
                                 ent.dashFrames = 0;
                                 ent.hasHit = false;
@@ -1329,6 +1348,7 @@ function gameLoop() {
                 }
             }
 
+            // 팽이 회전 애니메이션 및 잔상 렌더링 루프 (원격 플레이어 포함 전체 대상)
             entities.forEach((ent, i) => {
                 if (!ent.isAlive || !entityMeshes[i]) return;
                 let bm = entityMeshes[i];
@@ -1633,7 +1653,7 @@ function showResults() {
         if (resultChatBox) resultChatBox.style.display = 'flex';
         if (resultRoomCode) resultRoomCode.innerText = currentRoomCode;
         
-        // 오직 방장(isHost)에게만 REPLAY 버튼 표시
+        // 오직 방장(isHost)에게만 REPLAY 버튼 노출
         if (replayBtn) {
             replayBtn.style.display = isHost ? 'block' : 'none';
         }
