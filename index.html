@@ -13,7 +13,18 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
     <script>
-
+    // 회원님의 파이어베이스 설정 정보
+    const firebaseConfig = {
+    apiKey: "AIzaSyCStXmToMtsIBl6cgWqKK1py40CUwYVCH4",
+    authDomain: "pangkah-4ce6e.firebaseapp.com",
+    projectId: "pangkah-4ce6e",
+    storageBucket: "pangkah-4ce6e.firebasestorage.app",
+    messagingSenderId: "446419969567",
+    appId: "1:446419969567:web:7fca98d58fefcf4c25972a",
+    measurementId: "G-K7EP7PXFB4",
+    // 💡 위에서 복사한 Realtime Database 주소를 여기에 꼭 넣어주세요!
+    databaseURL: "https://pangkah-4ce6e-default-rtdb.firebaseio.com"
+    };
 
     // 파이어베이스 초기화
     firebase.initializeApp(firebaseConfig);
@@ -153,7 +164,8 @@
                 </div>
             </div>
 
-            <button class="action-btn play" onclick="restartCurrentGame()">REPLAY</button>
+            <!-- index.html의 결과 모달 부분에서 REPLAY 버튼을 찾아 아래처럼 수정하세요 -->
+            <button id="replay-btn" class="action-btn play" onclick="restartCurrentGame()">REPLAY</button>
             <button class="action-btn sub" style="margin-top:8px;" onclick="returnToLobby()">LOBBY</button>
         </div>
     </div>

@@ -279,19 +279,63 @@ window.startPrivateGameSession = function() {
 
 window.startQuickGame = function() {
     let nickname = document.getElementById('nickname-input').value || 'Player1';
-    let quickPlayers = [
-        { 
-            name: nickname, 
-            isHost: true,
-            blade: document.getElementById('select-blade').value,
-            tip: document.getElementById('select-tip').value,
-            zodiac: document.getElementById('select-zodiac').value || 'rat',
-            color1: document.getElementById('blade-color-1').value,
-            color2: document.getElementById('blade-color-2').value,
-            core: document.getElementById('core-color').value
-        }
-    ];
-    startGameSession(quickPlayers, 'quick');
+    gameMode = 'quick';
+    isHost = false;
+
+    let myData = {
+        name: nickname,
+        isHost: false,
+        blade: document.getElementById('select-blade').value,
+        tip: document.getElementById('select-tip').value,
+        zodiac: document.getElementById('select-zodiac').value || 'rat',
+        color1: document.getElementById('blade-color-1').value,
+        color2: document.getElementById('blade-color-2').value,
+        core: document.getElementById('core-color').value,
+        isAlive: true
+    };
+
+    publicRoomRef = db.ref('rooms/PUBLIC_ARENA');
+    publicRoomRef.once('value', (snapshot) => {
+        let data = snapshot.val();
+        let pList = data && data.players ? data.players : [];
+
+        // 중복 닉네임 방지 및 목록에 추가
+        pList = pList.filter(p => p.name !== nickname);
+        pList.push(myData);
+
+        publicRoomRef.set({
+            status: 'playing',
+            players: pList
+        });
+
+        roomPlayers = pList;
+        myPlayerIndex = pList.length - 1;
+
+        // 실시간 플레이어 입장/퇴장 동기화
+        publicRoomRef.child('players').on('value', (snap) => {
+            let updatedPlayers = snap.val();
+            if (updatedPlayers) {
+                roomPlayers = updatedPlayers;
+            }
+        });
+
+        // 퀵 아레나 실시간 위치 동기화
+        publicRoomRef.child('gameStates').on('value', (snapshot) => {
+            let states = snapshot.val();
+            if (!states) return;
+            states.forEach((st, idx) => {
+                if (idx !== myPlayerIndex && entities[idx] && entities[idx].isAlive) {
+                    entities[idx].targetX = st.x;
+                    entities[idx].targetY = st.y;
+                    entities[idx].vx = st.vx;
+                    entities[idx].vz = st.vz;
+                    entities[idx].isAlive = st.isAlive;
+                }
+            });
+        });
+
+        startGameSession(roomPlayers, 'quick');
+    });
 };
 
 const textureLoader = new THREE.TextureLoader();
@@ -1127,7 +1171,13 @@ function gameLoop() {
                 entities.forEach((ent, idx) => {
                     if (!ent.isAlive) return;
                     
-                    if (gameMode === 'private' && !ent.isPlayer) {
+                    if ((gameMode === 'private' || gameMode === 'quick') && !ent.isPlayer) {
+                        if (ent.targetX !== undefined && ent.targetY !== undefined) {
+                            ent.prevX = ent.x;
+                            ent.prevY = ent.y;
+                            ent.x += (ent.targetX - ent.x) * 0.35;
+                            ent.y += (ent.targetY - ent.y) * 0.35;
+                        }
                         return;
                     }
 
@@ -1193,17 +1243,21 @@ function gameLoop() {
                     ent.y += ent.vz;
                 });
 
-                if (gameMode === 'private' && roomRef && player && player.isAlive) {
+                // gameLoop 내부 아래 코드 부분을 찾아서 수정
+                if ((gameMode === 'private' || gameMode === 'quick') && player && player.isAlive) {
                     netSyncTimer++;
                     if (netSyncTimer >= 5) {
                         netSyncTimer = 0;
-                        roomRef.child(`gameStates/${myPlayerIndex}`).set({
-                            x: player.x,
-                            y: player.y,
-                            vx: player.vx,
-                            vz: player.vz,
-                            isAlive: player.isAlive
-                        });
+                        let activeRef = gameMode === 'private' ? roomRef : publicRoomRef;
+                        if (activeRef) {
+                            activeRef.child(`gameStates/${myPlayerIndex}`).set({
+                                x: player.x,
+                                y: player.y,
+                                vx: player.vx,
+                                vz: player.vz,
+                                isAlive: player.isAlive
+                            });
+                        }
                     }
                 }
 
@@ -1587,14 +1641,21 @@ function showResults() {
     let resultRoomInfo = document.getElementById('result-room-info');
     let resultChatBox = document.getElementById('result-chat-box');
     let resultRoomCode = document.getElementById('result-room-code');
+    let replayBtn = document.getElementById('replay-btn');
 
     if (gameMode === 'private') {
         if (resultRoomInfo) resultRoomInfo.style.display = 'block';
         if (resultChatBox) resultChatBox.style.display = 'flex';
         if (resultRoomCode) resultRoomCode.innerText = currentRoomCode;
+        
+        // 오직 방장(isHost)에게만 REPLAY 버튼 표시
+        if (replayBtn) {
+            replayBtn.style.display = isHost ? 'block' : 'none';
+        }
     } else {
         if (resultRoomInfo) resultRoomInfo.style.display = 'none';
         if (resultChatBox) resultChatBox.style.display = 'none';
+        if (replayBtn) replayBtn.style.display = 'none';
     }
 
     let resModal = document.getElementById('result-modal');
