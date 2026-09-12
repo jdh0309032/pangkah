@@ -1,18 +1,4 @@
-// 🔥 본인의 Firebase 설정 정보를 입력해주세요! (단 한 번만 선언)
-const firebaseConfig = {
-    apiKey: "AIzaSyCStXmToMtsIBl6cgWqKK1py40CUwYVCH4",
-    authDomain: "pangkah-4ce6e.firebaseapp.com",
-    databaseURL: "https://pangkah-4ce6e-default-rtdb.firebaseio.com",
-    projectId: "pangkah-4ce6e",
-    storageBucket: "pangkah-4ce6e.firebasestorage.app",
-    messagingSenderId: "446419969567",
-    appId: "1:446419969567:web:7fca98d58fefcf4c25972a",
-    measurementId: "G-K7EP7PXFB4"
-};
-
-if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-}
+// index.html에서 이미 Firebase가 초기화되었으므로 바로 database를 연결합니다.
 const db = firebase.database();
 let roomRef = null;
 let myPlayerIndex = 0;
@@ -333,7 +319,7 @@ function createColorizedZodiacTexture(sign, hexColor, callback) {
         ctx.fillRect(0, 0, 256, 256);
         
         let texture = new THREE.CanvasTexture(canvas);
-        texture.encoding = THREE.sRGBEncoding;
+        texture.colorSpace = THREE.SRGBColorSpace;
         zodiacCanvasTextureCache[cacheKey] = texture;
         callback(texture);
     };
@@ -388,7 +374,7 @@ function getTrailTexture() {
     ctx.fillRect(0, 0, 64, 128);
     
     let tex = new THREE.CanvasTexture(canvas);
-    tex.encoding = THREE.sRGBEncoding;
+    tex.colorSpace = THREE.SRGBColorSpace;
     trailTextureCache['default'] = tex;
     return tex;
 }
@@ -889,7 +875,7 @@ gltfLoader.load('./assets/models/custom_arena.glb', (gltf) => {
                         textureLoader.load(`./assets/textures/ads/${fileName}`, (tex) => {
                             tex.wrapS = THREE.ClampToEdgeWrapping;
                             tex.wrapT = THREE.ClampToEdgeWrapping;
-                            tex.encoding = THREE.sRGBEncoding;
+                            tex.colorSpace = THREE.SRGBColorSpace;
 
                             tex.center.set(0.5, 0.5);
                             if (mName.includes('center')) {
@@ -1008,13 +994,13 @@ function triggerDash() {
     player.dashDirZ = (dirZ / len) * 7;
 }
 
-function handleActionClick() {
+window.handleActionClick = function() {
     if (player && !player.isAlive && gameMode === 'private') {
         switchSpectateTarget();
     } else {
         triggerDash();
     }
-}
+};
 
 function switchSpectateTarget() {
     let aliveEntities = entities.filter(e => e.isAlive);
