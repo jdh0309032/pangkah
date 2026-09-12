@@ -1,12 +1,13 @@
-// 🔥 본인의 Firebase 설정 정보를 아래에 입력해주세요!
+// 🔥 본인의 Firebase 설정 정보를 입력해주세요!
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_AUTH_DOMAIN",
-    databaseURL: "YOUR_DATABASE_URL",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyCStXmToMtsIBl6cgWqKK1py40CUwYVCH4",
+    authDomain: "pangkah-4ce6e.firebaseapp.com",
+    databaseURL: "https://pangkah-4ce6e-default-rtdb.firebaseio.com",
+    projectId: "pangkah-4ce6e",
+    storageBucket: "pangkah-4ce6e.firebasestorage.app",
+    messagingSenderId: "446419969567",
+    appId: "1:446419969567:web:7fca98d58fefcf4c25972a",
+    measurementId: "G-K7EP7PXFB4"
 };
 
 if (!firebase.apps.length) {
@@ -14,6 +15,7 @@ if (!firebase.apps.length) {
 }
 const db = firebase.database();
 let roomRef = null;
+let myPlayerIndex = 0;
 
 function openCustomModal() {
     document.getElementById('custom-modal').style.display = 'flex';
@@ -43,7 +45,7 @@ function createRoom() {
     document.getElementById('room-waiting-view').style.display = 'flex';
     
     let nickname = document.getElementById('nickname-input').value || 'Player1';
-    roomPlayers = [{ name: nickname, isHost: true }];
+    roomPlayers = [{ name: nickname, isHost: true, blade: document.getElementById('select-blade').value, tip: document.getElementById('select-tip').value, zodiac: document.getElementById('select-zodiac').value || 'rat', color1: document.getElementById('blade-color-1').value, color2: document.getElementById('blade-color-2').value, core: document.getElementById('core-color').value }];
     
     roomRef = db.ref('rooms/' + currentRoomCode);
     roomRef.set({
@@ -93,7 +95,16 @@ function joinRoom() {
         }
         roomPlayers = data.players || [];
         if (!roomPlayers.some(p => p.name === nickname)) {
-            roomPlayers.push({ name: nickname, isHost: false });
+            roomPlayers.push({ 
+                name: nickname, 
+                isHost: false,
+                blade: document.getElementById('select-blade').value,
+                tip: document.getElementById('select-tip').value,
+                zodiac: document.getElementById('select-zodiac').value || 'rat',
+                color1: document.getElementById('blade-color-1').value,
+                color2: document.getElementById('blade-color-2').value,
+                core: document.getElementById('core-color').value
+            });
             roomRef.update({ players: roomPlayers });
         }
 
@@ -157,7 +168,17 @@ function addBotToPrivateRoom() {
     }
     let botNames = ['BladeKing', 'SpinMaster', 'NoobSlayer', 'TornadoX', 'IronSpins'];
     let bName = botNames[roomPlayers.length % botNames.length] + (roomPlayers.length + 1);
-    roomPlayers.push({ name: bName, isHost: false, isBot: true });
+    roomPlayers.push({ 
+        name: bName, 
+        isHost: false, 
+        isBot: true,
+        blade: 'circle',
+        tip: 'speed',
+        zodiac: 'rat',
+        color1: '#ef4444',
+        color2: '#b91c1c',
+        core: '#f59e0b'
+    });
     
     if (roomRef) {
         roomRef.update({ players: roomPlayers });
@@ -245,7 +266,7 @@ function startPrivateGameSession() {
         return;
     }
     if (!roomPlayers || roomPlayers.length <= 0) {
-        alert('참가자나 봇이 최소 1명 이상 있어야 시작할 수 있습니다!');
+        alert('참가자가 최소 1명 이상 있어야 합니다!');
         return;
     }
     if (roomRef) {
@@ -255,11 +276,19 @@ function startPrivateGameSession() {
     startGameSession(roomPlayers, 'private');
 }
 
-// 💡 자유 게임방(Quick Game)에서 봇 3명 제거 (플레이어 혼자 서바이벌)
 function startQuickGame() {
     let nickname = document.getElementById('nickname-input').value || 'Player1';
     let quickPlayers = [
-        { name: nickname, isHost: true }
+        { 
+            name: nickname, 
+            isHost: true,
+            blade: document.getElementById('select-blade').value,
+            tip: document.getElementById('select-tip').value,
+            zodiac: document.getElementById('select-zodiac').value || 'rat',
+            color1: document.getElementById('blade-color-1').value,
+            color2: document.getElementById('blade-color-2').value,
+            core: document.getElementById('core-color').value
+        }
     ];
     startGameSession(quickPlayers, 'quick');
 }
@@ -420,12 +449,6 @@ function startGameSession(playerList, mode) {
     }
     if (ingameChatBox) ingameChatBox.style.display = 'none';
 
-    let pType = document.getElementById('select-blade').value;
-    let tType = document.getElementById('select-tip').value;
-    let zType = document.getElementById('select-zodiac').value || 'rat';
-    let bCol1 = document.getElementById('blade-color-1').value;
-    let bCol2 = document.getElementById('blade-color-2').value;
-    let cCol = document.getElementById('core-color').value;
     let pName = document.getElementById('nickname-input').value || 'Player1';
 
     let dashBtn = document.getElementById('dash-btn');
@@ -433,6 +456,10 @@ function startGameSession(playerList, mode) {
     let timerRing = document.getElementById('dash-timer-ring');
     let dashIconMask = document.getElementById('dash-icon-mask');
     
+    let myInfo = playerList.find(p => p.name === pName) || playerList[0];
+    let cCol = myInfo.core || '#f59e0b';
+    let zType = myInfo.zodiac || 'rat';
+
     if (dashBtn) {
         dashBtn.className = "";
         dashBtn.style.background = cCol;
@@ -478,21 +505,15 @@ function startGameSession(playerList, mode) {
         let sx = Math.cos(angle) * spawnRadius;
         let sy = Math.sin(angle) * spawnRadius;
 
-        let isThisPlayer = (p.name === pName || (idx === 0 && !playerList.some(x => x.name === pName)));
+        let isThisPlayer = (p.name === pName);
         let ent;
 
-        if (isThisPlayer && !player) {
-            player = createEntity(sx, sy, pType, tType, zType, bCol1, bCol2, cCol, pName, true);
+        if (isThisPlayer) {
+            myPlayerIndex = idx;
+            player = createEntity(sx, sy, p.blade || 'circle', p.tip || 'speed', p.zodiac || 'rat', p.color1 || '#3b82f6', p.color2 || '#1d4ed8', p.core || '#f59e0b', p.name, true);
             ent = player;
         } else {
-            let types = ['circle', 'saw', 'shield'];
-            let tips = ['speed', 'heavy'];
-            let colors1 = ['#ef4444', '#10b981', '#8b5cf6', '#f97316'];
-            let colors2 = ['#b91c1c', '#047857', '#6d28d9', '#c2410c'];
-            let coreColors = ['#f59e0b', '#38bdf8', '#ec4899', '#84cc16'];
-            let botsZodiac = ['ox', 'tiger', 'dragon', 'rabbit', 'snake', 'horse'];
-            
-            ent = createEntity(sx, sy, types[idx % types.length], tips[idx % 2], botsZodiac[idx % botsZodiac.length] || 'rat', colors1[idx % colors1.length], colors2[idx % colors2.length], coreColors[idx % coreColors.length], p.name, false);
+            ent = createEntity(sx, sy, p.blade || 'circle', p.tip || 'speed', p.zodiac || 'rat', p.color1 || '#ef4444', p.color2 || '#b91c1c', p.core || '#38bdf8', p.name, false);
         }
         entities.push(ent);
 
@@ -506,6 +527,22 @@ function startGameSession(playerList, mode) {
         entityTrails.push(trailData);
     });
 
+    if (gameMode === 'private' && roomRef) {
+        roomRef.child('gameStates').on('value', (snapshot) => {
+            let states = snapshot.val();
+            if (!states) return;
+            states.forEach((st, idx) => {
+                if (idx !== myPlayerIndex && entities[idx] && entities[idx].isAlive) {
+                    entities[idx].x = st.x;
+                    entities[idx].y = st.y;
+                    entities[idx].vx = st.vx;
+                    entities[idx].vz = st.vz;
+                    entities[idx].isAlive = st.isAlive;
+                }
+            });
+        });
+    }
+
     gameStarted = true;
     gamePhase = 'countdown';
     countdownTimer = 180; 
@@ -518,6 +555,7 @@ function startGameSession(playerList, mode) {
 function returnToLobby() {
     gameStarted = false;
     gamePhase = 'waiting';
+    if (roomRef) roomRef.child('gameStates').off();
     document.getElementById('game-ui').style.display = 'none';
     document.getElementById('result-modal').style.display = 'none';
     let ingameChatLog = document.getElementById('ingame-chat-log');
@@ -1020,6 +1058,8 @@ function renderLayeredScene() {
     gameRenderer.render(beybladeScene, gameCam);
 }
 
+let netSyncTimer = 0;
+
 function gameLoop() {
     try {
         if (!gameStarted) {
@@ -1083,10 +1123,14 @@ function gameLoop() {
             }
 
             if (gamePhase === 'playing') {
-                entities.forEach((ent) => {
+                entities.forEach((ent, idx) => {
                     if (!ent.isAlive) return;
                     
-                    let tipStat = PARTS_STAT[ent.tipType];
+                    if (gameMode === 'private' && !ent.isPlayer) {
+                        return;
+                    }
+
+                    let tipStat = PARTS_STAT[ent.tipType] || PARTS_STAT['speed'];
                     
                     ent.prevX = ent.x;
                     ent.prevY = ent.y;
@@ -1094,17 +1138,6 @@ function gameLoop() {
                     if (ent.staggerTimer > 0) ent.staggerTimer--;
 
                     if (ent.isPlayer) {
-                        if (ent.comboTimer > 0) {
-                            ent.comboTimer--;
-                            if (ent.comboTimer <= 0) ent.comboCount = 0;
-                        }
-                        if (ent.isCooldown) {
-                            ent.cooldownTimer--;
-                            if (ent.cooldownTimer <= 0) ent.isCooldown = false;
-                        }
-                    }
-
-                    if (!ent.isPlayer) {
                         if (ent.comboTimer > 0) {
                             ent.comboTimer--;
                             if (ent.comboTimer <= 0) ent.comboCount = 0;
@@ -1144,50 +1177,6 @@ function gameLoop() {
                             let accel = 0.45 * tipStat.speedBonus;
                             ent.vx += mx * accel;
                             ent.vz += mz * accel;
-                        } else {
-                            ent.aiTimer = (ent.aiTimer || 0) - 1;
-                            if (ent.aiTimer <= 0) {
-                                ent.aiTimer = 40 + Math.random() * 60;
-                                let dCenter = Math.sqrt(ent.x * ent.x + ent.y * ent.y);
-                                if (dCenter > 190) {
-                                    ent.aiState = 'defend';
-                                } else {
-                                    let choices = ['attack', 'circle', 'defend'];
-                                    ent.aiState = choices[Math.floor(Math.random() * choices.length)];
-                                }
-                            }
-
-                            let target = player && player.isAlive ? player : entities.find(e => e.isAlive && e !== ent);
-                            if (target) {
-                                let dx = target.x - ent.x;
-                                let dz = target.y - ent.y;
-                                let d = Math.sqrt(dx*dx + dz*dz) || 1;
-
-                                if (ent.aiState === 'attack') {
-                                    ent.vx += (dx / d) * 0.35;
-                                    ent.vz += (dz / d) * 0.35;
-                                } else if (ent.aiState === 'circle') {
-                                    let perpX = -dz / d;
-                                    let perpZ = dx / d;
-                                    ent.vx += (perpX * 0.3 + (dx / d) * 0.12);
-                                    ent.vz += (perpZ * 0.3 + (dz / d) * 0.12);
-                                } else if (ent.aiState === 'defend') {
-                                    let toCenterX = -ent.x;
-                                    let toCenterZ = -ent.y;
-                                    let cDist = Math.sqrt(toCenterX*toCenterX + toCenterZ*toCenterZ) || 1;
-                                    ent.vx += (toCenterX / cDist) * 0.28;
-                                    ent.vz += (toCenterZ / cDist) * 0.28;
-                                }
-
-                                if (d < 140 && !ent.isCooldown && Math.random() < 0.025) {
-                                    ent.isDashing = true;
-                                    ent.hasHit = false;
-                                    ent.hasScoredHit = false;
-                                    ent.dashFrames = 10;
-                                    ent.dashDirX = (dx / d) * 7;
-                                    ent.dashDirZ = (dz / d) * 7;
-                                }
-                            }
                         }
                         ent.vx *= 0.86;
                         ent.vz *= 0.86;
@@ -1202,6 +1191,20 @@ function gameLoop() {
                     ent.x += ent.vx;
                     ent.y += ent.vz;
                 });
+
+                if (gameMode === 'private' && roomRef && player && player.isAlive) {
+                    netSyncTimer++;
+                    if (netSyncTimer >= 5) {
+                        netSyncTimer = 0;
+                        roomRef.child(`gameStates/${myPlayerIndex}`).set({
+                            x: player.x,
+                            y: player.y,
+                            vx: player.vx,
+                            vz: player.vz,
+                            isAlive: player.isAlive
+                        });
+                    }
+                }
 
                 for (let i = 0; i < entities.length; i++) {
                     for (let j = i + 1; j < entities.length; j++) {
@@ -1225,63 +1228,6 @@ function gameLoop() {
                             e2.y += nz * overlap * 0.55;
 
                             createCollisionSpark((e1.x + e2.x) / 2, (e1.y + e2.y) / 2);
-
-                            let angleMultiplier = 1.0;
-                            if (e2.staggerTimer > 0 || e2.isStunned) {
-                                angleMultiplier = 2.2; 
-                            } else {
-                                let e2Speed = Math.sqrt(e2.vx * e2.vx + e2.vz * e2.vz);
-                                if (e2Speed > 0.1) {
-                                    let v2x = e2.vx / e2Speed;
-                                    let v2z = e2.vz / e2Speed;
-                                    let dot = v2x * nx + v2z * nz;
-                                    let angleRad = Math.acos(Math.max(-1, Math.min(1, Math.abs(dot))));
-                                    let angleDeg = angleRad * (180 / Math.PI);
-                                    if (angleDeg <= 45) {
-                                        angleMultiplier = 1.0; 
-                                    } else if (angleDeg <= 135) {
-                                        angleMultiplier = 1.4; 
-                                    } else {
-                                        angleMultiplier = 2.2; 
-                                    }
-                                }
-                            }
-
-                            let statA = PARTS_STAT[e1.type] || PARTS_STAT['circle'];
-                            let statD = PARTS_STAT[e2.type] || PARTS_STAT['circle'];
-                            let wtA = getEntityWeight(e1);
-                            let wtD = getEntityWeight(e2);
-                            let weightAtkRatio = (statA.atk * wtA) / (statD.def * wtD);
-
-                            if (e1.isDashing) {
-                                if (overlap > 1.0) {
-                                    e1.hasHit = true;
-                                    if (e1.isPlayer && !e1.hasScoredHit) {
-                                        e1.hasScoredHit = true;
-                                        e1.comboCount++;
-                                        e1.comboTimer = 300; 
-                                    }
-                                    e2.staggerTimer = 60; 
-                                    
-                                    let baseForce = 18.0;
-                                    let comboBonus = (e1.comboCount || 0) * 5.0;
-                                    let knockbackForce = (baseForce + comboBonus) * weightAtkRatio * angleMultiplier;
-                                    
-                                    e2.vx += nx * knockbackForce;
-                                    e2.vz += nz * knockbackForce;
-                                    e1.vx = -nx * 4.0;
-                                    e1.vz = -nz * 4.0;
-                                }
-                            } else {
-                                let baseForce = 10.0;
-                                let comboBonus = (e1.comboCount || 0) * 5.0;
-                                let knockbackForce = (baseForce + comboBonus) * weightAtkRatio * angleMultiplier;
-
-                                e1.vx -= nx * (knockbackForce * 0.4);
-                                e1.vz -= nz * (knockbackForce * 0.4);
-                                e2.vx += nx * knockbackForce;
-                                e2.vz += nz * knockbackForce;
-                            }
                         }
                     }
                 }
@@ -1307,11 +1253,6 @@ function gameLoop() {
                                 ent.comboTimer = 0;
                                 ent.isCooldown = false;
                                 ent.cooldownTimer = 0;
-                            } else {
-                                ent.x = (Math.random() - 0.5) * 100;
-                                ent.y = (Math.random() - 0.5) * 100;
-                                ent.vx = 0; ent.vz = 0;
-                                ent.survivalTime = 0;
                             }
                         } else {
                             ent.isAlive = false;
