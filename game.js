@@ -320,10 +320,26 @@ window.startQuickGame = function() {
         roomPlayers = pList;
         myPlayerIndex = pList.length - 1;
 
-        publicRoomRef.child('players').on('value', (snap) => {
+publicRoomRef.child('players').on('value', (snap) => {
             let updatedPlayers = snap.val();
-            if (updatedPlayers) {
+            if (updatedPlayers && gamePhase === 'playing') {
                 roomPlayers = updatedPlayers;
+                // 새로운 유저가 들어오면 내 화면에도 3D 모델 즉시 생성
+                roomPlayers.forEach((p, idx) => {
+                    if (!entities[idx]) {
+                        let ent = createEntity(0, 120, p.blade || 'circle', p.tip || 'speed', p.zodiac || 'rat', p.color1, p.color2, p.core, p.name, false);
+                        entities[idx] = ent;
+                        
+                        let mesh = createBeybladeMesh(ent.type, ent.tipType, ent.zodiac, ent.bladeColor1, ent.bladeColor2, ent.coreColor);
+                        mesh.position.set(ent.x, ent.dropHeight, ent.y);
+                        beybladeScene.add(mesh);
+                        entityMeshes[idx] = mesh;
+                        
+                        let trailData = createDynamicTrail(ent.bladeColor1);
+                        beybladeScene.add(trailData.mesh);
+                        entityTrails[idx] = trailData;
+                    }
+                });
             }
         });
 
@@ -1264,7 +1280,7 @@ function gameLoop() {
                     }
                 }
 
-                // 팽이 간 충돌 판정 및 상호작용
+                // 팽이 간 충돌 판정 및 상호작용 (Knockback 적용)
                 for (let i = 0; i < entities.length; i++) {
                     for (let j = i + 1; j < entities.length; j++) {
                         let e1 = entities[i];
@@ -1281,10 +1297,25 @@ function gameLoop() {
                             let nx = dx / dist;
                             let nz = dz / dist;
 
-                            e1.x -= nx * overlap * 0.55;
-                            e1.y -= nz * overlap * 0.55;
-                            e2.x += nx * overlap * 0.55;
-                            e2.y += nz * overlap * 0.55;
+                            // 위치 겹침 방지 (로컬 유저만 직접 이동)
+                            if (e1.isPlayer) { e1.x -= nx * overlap * 0.5; e1.y -= nz * overlap * 0.5; }
+                            if (e2.isPlayer) { e2.x += nx * overlap * 0.5; e2.y += nz * overlap * 0.5; }
+
+                            // 물리적 튕겨나감 (속도 반발력 추가)
+                            let knockbackForce = 3.5; // 튕겨나가는 파워 (수치 조절 가능)
+                            
+                            // 대시 중이거나 콤보가 높으면 더 강하게 튕겨냄
+                            if (e1.isDashing) knockbackForce *= 1.5;
+                            if (e2.isDashing) knockbackForce *= 1.5;
+
+                            if (e1.isPlayer) {
+                                e1.vx -= nx * knockbackForce;
+                                e1.vz -= nz * knockbackForce;
+                            }
+                            if (e2.isPlayer) {
+                                e2.vx += nx * knockbackForce;
+                                e2.vz += nz * knockbackForce;
+                            }
 
                             createCollisionSpark((e1.x + e2.x) / 2, (e1.y + e2.y) / 2);
                         }
@@ -1348,7 +1379,7 @@ function gameLoop() {
                 }
             }
 
-            // 팽이 회전 애니메이션 및 잔상 렌더링 루프 (원격 플레이어 포함 전체 대상)
+            // 팽이 회전 애니메이션 및 잔상 렌더링 루프
             entities.forEach((ent, i) => {
                 if (!ent.isAlive || !entityMeshes[i]) return;
                 let bm = entityMeshes[i];
@@ -1356,10 +1387,21 @@ function gameLoop() {
                 let moveVelX = ent.x - ent.prevX;
                 let moveVelZ = ent.y - ent.prevY;
 
-                bm.rotation.z += (-moveVelX * 0.15 - bm.rotation.z) * 0.15;
-                bm.rotation.x += (moveVelZ * 0.15 - bm.rotation.x) * 0.15;
+                // 목표 기울기 계산 (네트워크 워프로 인한 비정상 속도 방어)
+                let targetTiltZ = -moveVelX * 0.15;
+                let targetTiltX = moveVelZ * 0.15;
+                
+                // 앞구르기 방지: 최대 기울기를 약 30도(0.5라디안)로 제한
+                const MAX_TILT = 0.5;
+                targetTiltZ = Math.max(-MAX_TILT, Math.min(MAX_TILT, targetTiltZ));
+                targetTiltX = Math.max(-MAX_TILT, Math.min(MAX_TILT, targetTiltX));
+
+                bm.rotation.z += (targetTiltZ - bm.rotation.z) * 0.15;
+                bm.rotation.x += (targetTiltX - bm.rotation.x) * 0.15;
+                
                 if (bm.userData && bm.userData.spinGroup) {
                     bm.userData.spinGroup.rotation.y -= 0.75;
+                    // ...(이하 오라(Aura) 렌더링 코드는 그대로 유지)
                     
                     let aura = bm.userData.spinGroup.getObjectByName('tornadoParticles');
                     if (aura) {
