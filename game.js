@@ -17,27 +17,28 @@ const db = firebase.database();
 let roomRef = null;
 let myPlayerIndex = 0;
 
-function openCustomModal() {
+// 💡 함수 선언과 동시에 전역(window)에 등록하여 에러 방지
+window.openCustomModal = function() {
     document.getElementById('custom-modal').style.display = 'flex';
-}
-function closeCustomModal() {
+};
+window.closeCustomModal = function() {
     document.getElementById('custom-modal').style.display = 'none';
-}
+};
 
-function openMultiplayerModal() {
+window.openMultiplayerModal = function() {
     document.getElementById('multiplayer-modal').style.display = 'flex';
     document.getElementById('room-menu-view').style.display = 'block';
     document.getElementById('room-waiting-view').style.display = 'none';
-}
-function closeMultiplayerModal() {
+};
+window.closeMultiplayerModal = function() {
     document.getElementById('multiplayer-modal').style.display = 'none';
-}
+};
 
 let currentRoomCode = '';
 let isHost = false;
 let roomPlayers = [];
 
-function createRoom() {
+window.createRoom = function() {
     currentRoomCode = Math.floor(1000 + Math.random() * 9000).toString();
     isHost = true;
     document.getElementById('display-room-code').innerText = currentRoomCode;
@@ -69,9 +70,9 @@ function createRoom() {
     updateRoomPlayerList();
     clearPrivateChat();
     addChatSystemMessage(`Room created! Code: ${currentRoomCode}`);
-}
+};
 
-function joinRoom() {
+window.joinRoom = function() {
     let code = document.getElementById('room-code-input').value.trim();
     if (code.length !== 4) {
         alert('Please enter a valid 4-digit room code.');
@@ -90,7 +91,7 @@ function joinRoom() {
         let data = snapshot.val();
         if (!data) {
             alert('존재하지 않는 방 코드입니다!');
-            leaveRoom();
+            window.leaveRoom();
             return;
         }
         roomPlayers = data.players || [];
@@ -125,9 +126,9 @@ function joinRoom() {
         clearPrivateChat();
         addChatSystemMessage(`Joined room ${currentRoomCode}`);
     });
-}
+};
 
-function leaveRoom() {
+window.leaveRoom = function() {
     if (roomRef) {
         roomRef.off();
         if (!isHost) {
@@ -147,7 +148,7 @@ function leaveRoom() {
     clearPrivateChat();
     document.getElementById('room-waiting-view').style.display = 'none';
     document.getElementById('room-menu-view').style.display = 'block';
-}
+};
 
 function updateRoomPlayerList() {
     document.getElementById('player-count').innerText = roomPlayers.length;
@@ -161,7 +162,7 @@ function updateRoomPlayerList() {
     document.getElementById('room-player-list').innerHTML = html;
 }
 
-function addBotToPrivateRoom() {
+window.addBotToPrivateRoom = function() {
     if (!isHost) {
         alert('방장만 봇을 추가할 수 있습니다!');
         return;
@@ -185,7 +186,7 @@ function addBotToPrivateRoom() {
     }
     updateRoomPlayerList();
     addChatSystemMessage(`Added bot: ${bName}`);
-}
+};
 
 function addChatSystemMessage(msg) {
     let cm = document.getElementById('chat-messages');
@@ -195,7 +196,7 @@ function addChatSystemMessage(msg) {
     }
 }
 
-function sendChatMessage() {
+window.sendChatMessage = function() {
     let input = document.getElementById('chat-input');
     if (!input) return;
     let text = input.value.trim();
@@ -211,9 +212,9 @@ function sendChatMessage() {
     
     appendIngameChatLog(nickname, text);
     appendResultChatLog(nickname, text);
-}
+};
 
-function sendIngameChatMessage() {
+window.sendIngameChatMessage = function() {
     let input = document.getElementById('ingame-chat-input');
     if (!input) return;
     let text = input.value.trim();
@@ -222,9 +223,9 @@ function sendIngameChatMessage() {
     
     appendIngameChatLog(nickname, text);
     input.value = '';
-}
+};
 
-function sendResultChatMessage() {
+window.sendResultChatMessage = function() {
     let input = document.getElementById('result-chat-input');
     if (!input) return;
     let text = input.value.trim();
@@ -233,7 +234,7 @@ function sendResultChatMessage() {
     
     appendResultChatLog(nickname, text);
     input.value = '';
-}
+};
 
 function appendIngameChatLog(sender, text) {
     let log = document.getElementById('ingame-chat-log');
@@ -260,7 +261,7 @@ function clearPrivateChat() {
     if (rcm) rcm.innerHTML = '';
 }
 
-function startPrivateGameSession() {
+window.startPrivateGameSession = function() {
     if (!isHost) {
         alert('방장만 게임을 시작할 수 있습니다!');
         return;
@@ -274,9 +275,9 @@ function startPrivateGameSession() {
     }
     closeMultiplayerModal();
     startGameSession(roomPlayers, 'private');
-}
+};
 
-function startQuickGame() {
+window.startQuickGame = function() {
     let nickname = document.getElementById('nickname-input').value || 'Player1';
     let quickPlayers = [
         { 
@@ -291,7 +292,7 @@ function startQuickGame() {
         }
     ];
     startGameSession(quickPlayers, 'quick');
-}
+};
 
 const textureLoader = new THREE.TextureLoader();
 
@@ -552,7 +553,7 @@ function startGameSession(playerList, mode) {
     if (numElem) numElem.innerText = '3';
 }
 
-function returnToLobby() {
+window.returnToLobby = function() {
     gameStarted = false;
     gamePhase = 'waiting';
     if (roomRef) roomRef.child('gameStates').off();
@@ -571,9 +572,9 @@ function returnToLobby() {
     entityTrails = [];
     activeSparks.forEach(s => { if (s && s.mesh) beybladeScene.remove(s.mesh); });
     activeSparks = [];
-}
+};
 
-function restartCurrentGame() {
+window.restartCurrentGame = function() {
     document.getElementById('result-modal').style.display = 'none';
     if (gameMode === 'private') {
         if (!roomPlayers || roomPlayers.length === 0) {
@@ -586,7 +587,7 @@ function restartCurrentGame() {
     } else {
         startQuickGame();
     }
-}
+};
 
 const showroomScene = new THREE.Scene();
 showroomScene.background = new THREE.Color('#000000');
@@ -824,7 +825,7 @@ function createBeybladeMesh(bladeType, tipType, zodiacType, bladeCol1, bladeCol2
 let showroomTop = createBeybladeMesh('circle', 'speed', 'rat', '#3b82f6', '#1d4ed8', '#f59e0b');
 showroomScene.add(showroomTop);
 
-function updateShowroom() {
+window.updateShowroom = function() {
     showroomScene.remove(showroomTop);
     let bType = document.getElementById('select-blade').value;
     let tType = document.getElementById('select-tip').value;
@@ -834,7 +835,7 @@ function updateShowroom() {
     let cCol = document.getElementById('core-color').value;
     showroomTop = createBeybladeMesh(bType, tType, zType, bCol1, bCol2, cCol);
     showroomScene.add(showroomTop);
-}
+};
 
 const gameScene = new THREE.Scene();
 gameScene.background = new THREE.Color('#000000');
@@ -1605,22 +1606,5 @@ window.addEventListener('resize', () => {
     gameCam.updateProjectionMatrix();
     gameRenderer.setSize(window.innerWidth, window.innerHeight);
 });
-
-// 💡 HTML의 onclick 속성에서 함수를 인식할 수 있도록 전역 객체에 명시적 등록
-window.openCustomModal = openCustomModal;
-window.closeCustomModal = closeCustomModal;
-window.openMultiplayerModal = openMultiplayerModal;
-window.closeMultiplayerModal = closeMultiplayerModal;
-window.createRoom = createRoom;
-window.joinRoom = joinRoom;
-window.leaveRoom = leaveRoom;
-window.addBotToPrivateRoom = addBotToPrivateRoom;
-window.startPrivateGameSession = startPrivateGameSession;
-window.startQuickGame = startQuickGame;
-window.sendChatMessage = sendChatMessage;
-window.sendIngameChatMessage = sendIngameChatMessage;
-window.sendResultChatMessage = sendResultChatMessage;
-window.restartCurrentGame = restartCurrentGame;
-window.returnToLobby = returnToLobby;
 
 gameLoop();
