@@ -1,18 +1,3 @@
-// 🔥 본인의 Firebase 설정 정보를 입력해주세요! (단 한 번만 선언)
-const firebaseConfig = {
-    apiKey: "AIzaSyCStXmToMtsIBl6cgWqKK1py40CUwYVCH4",
-    authDomain: "pangkah-4ce6e.firebaseapp.com",
-    databaseURL: "https://pangkah-4ce6e-default-rtdb.firebaseio.com",
-    projectId: "pangkah-4ce6e",
-    storageBucket: "pangkah-4ce6e.firebasestorage.app",
-    messagingSenderId: "446419969567",
-    appId: "1:446419969567:web:7fca98d58fefcf4c25972a",
-    measurementId: "G-K7EP7PXFB4"
-};
-
-if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-}
 const db = firebase.database();
 let roomRef = null;
 let myPlayerIndex = 0;
