@@ -7,7 +7,7 @@ let roomStatus = 'waiting';
 // --- 랜덤 기본 닉네임 부여 ---
 const R_NAMES = ["레드드래곤", "블루스톰", "블랙타이거", "고스트", "스피드스타", "다크나이트", "윈드러너", "아이언사이드", "쉐도우", "골든라이언"];
 let nickInput = document.getElementById('nickname-input');
-if (nickInput && !nickInput.value) {
+if (nickInput && (!nickInput.value || nickInput.value === "Player 1")) {
     nickInput.value = R_NAMES[Math.floor(Math.random() * R_NAMES.length)] + Math.floor(Math.random() * 999);
 }
 
@@ -126,7 +126,7 @@ function setupPrivateRoomListener() {
             startGameSession(roomPlayers, 'private');
         } else if (newStatus === 'gameover') {
             roomStatus = 'gameover';
-        } else if (newStatus === 'waiting') {
+        } else if (newStatus === 'waiting' && roomStatus !== 'waiting') {
             roomStatus = 'waiting';
         }
     });
@@ -188,7 +188,7 @@ window.startPrivateGameSession = function() {
     }
 };
 
-// --- 상시 오픈 퀵 아레나 (서버 연동 & 봇 없음) ---
+// --- 상시 오픈 퀵 아레나 (실시간 난입/퇴장 완벽 지원) ---
 window.startQuickGame = function() {
     if (!db) return alert("Firebase is not initialized!");
     gameMode = 'quick';
@@ -201,28 +201,32 @@ window.startQuickGame = function() {
     
     publicRoomRef.child('players/' + mySessionId).set(getMyPlayerData());
 
-    // 초기 입장 시점 데이터 로드 및 게임 시작
+    // 게임 씬 최초 생성
     publicRoomRef.child('players').once('value', snap => {
         let pObj = snap.val() || {};
         roomPlayers = Object.values(pObj);
         startGameSession(roomPlayers, 'quick');
-    });
-
-    // 실시간 유저 난입/퇴장 감지
-    publicRoomRef.child('players').on('value', snap => {
-        let pObj = snap.val() || {};
-        if (gamePhase === 'playing' || gamePhase === 'countdown') {
-            Object.keys(pObj).forEach(pid => {
-                if (pid !== mySessionId && !entities.find(e => e.id === pid)) {
-                    spawnEntityDynamic(pObj[pid]); // 새로운 유저 소환
-                }
-            });
-            for (let i = entities.length - 1; i >= 0; i--) {
-                if (entities[i].id !== mySessionId && !pObj[entities[i].id]) {
-                    removeEntityFromScene(i); // 나간 유저 삭제
+        
+        // 접속 후 다른 유저들의 난입(Join) 감지
+        publicRoomRef.child('players').on('child_added', childSnap => {
+            let pd = childSnap.val();
+            if (pd && pd.id !== mySessionId) {
+                if (gamePhase === 'playing' || gamePhase === 'countdown') {
+                    if (!entities.find(e => e.id === pd.id)) {
+                        spawnEntityDynamic(pd);
+                    }
                 }
             }
-        }
+        });
+        
+        // 접속 후 다른 유저들의 퇴장(Leave) 감지
+        publicRoomRef.child('players').on('child_removed', childSnap => {
+            let pd = childSnap.val();
+            if (pd) {
+                let idx = entities.findIndex(e => e.id === pd.id);
+                if (idx !== -1) removeEntityFromScene(idx);
+            }
+        });
     });
 };
 
@@ -716,7 +720,7 @@ function createBeybladeMesh(bladeType, tipType, zodiacType, bladeCol1, bladeCol2
         createColorizedZodiacTexture(zodiacType, visibleIconColor, (tex) => { 
             if (tex) { 
                 tex.center.set(0.5, 0.5); 
-                tex.rotation = 0; // 거꾸로 나오던 문제 수정 완료
+                tex.rotation = 0; 
                 bitMat.map = tex; 
                 bitMat.needsUpdate = true; 
             } 
@@ -864,7 +868,7 @@ gltfLoader.load('./assets/models/custom_arena.glb', (gltf) => {
     gameScene.add(ring);
 });
 
-// --- 입력 제어 ---
+// --- 입력 제어 (모바일 동시 터치 방지 및 대시 분리 적용) ---
 let inputDirX = 0, inputDirZ = 0, activeTouchId = null, joystickBaseX = 0, joystickBaseY = 0; 
 const maxDist = 45;
 const joystickBase = document.getElementById('joystick-base'); 
@@ -873,6 +877,10 @@ const joystickStick = document.getElementById('joystick-stick');
 window.addEventListener('pointerdown', (e) => {
     if (!gameStarted || gamePhase !== 'playing' || (player && !player.isAlive)) return;
     if (e.target.closest('#dash-btn') || e.target.closest('#exit-btn') || e.target.closest('.modal') || e.target.closest('#ingame-chat-box')) return;
+    
+    // 이미 조이스틱을 터치 중이라면 추가 터치를 무시하여 조이스틱이 순간이동하지 않게 보호
+    if (activeTouchId !== null) return;
+    
     activeTouchId = e.pointerId; 
     joystickBaseX = e.clientX; 
     joystickBaseY = e.clientY;
@@ -927,6 +935,16 @@ window.handleActionClick = function() {
     } 
 };
 
+// 모바일용 대시버튼 이벤트 선점 등록
+const dashBtnElem = document.getElementById('dash-btn');
+if (dashBtnElem) {
+    dashBtnElem.addEventListener('pointerdown', (e) => {
+        e.preventDefault(); 
+        e.stopPropagation();
+        window.handleActionClick();
+    });
+}
+
 function switchSpectateTarget() { 
     let aliveEntities = entities.filter(e => e.isAlive); 
     if (aliveEntities.length === 0) return; 
@@ -934,7 +952,13 @@ function switchSpectateTarget() {
 }
 
 let keys = {}; 
-window.addEventListener('keydown', (e) => { keys[e.code] = true; if (e.code === 'Space') window.triggerDash(); }); 
+window.addEventListener('keydown', (e) => { 
+    keys[e.code] = true; 
+    if (e.code === 'Space') { 
+        e.preventDefault(); // 스페이스바 클릭으로 인한 버튼 눌림 및 페이지 강제 새로고침 원천 차단
+        window.triggerDash(); 
+    } 
+}); 
 window.addEventListener('keyup', (e) => { keys[e.code] = false; });
 
 setInterval(() => { 
@@ -958,7 +982,7 @@ function renderLayeredScene() {
     gameRenderer.render(beybladeScene, gameCam); 
 }
 
-// --- 게임 루프 (부드러운 동기화 및 자체 물리 엔진 적용) ---
+// --- 게임 루프 ---
 function gameLoop() {
     try {
         if (!gameStarted) {
@@ -1097,37 +1121,42 @@ function gameLoop() {
                     ent.x += ent.vx; 
                     ent.y += ent.vz;
 
-                    // 2. 네트워크 보간 (Refresh 없이 부드럽게 위치 맞추기)
+                    // 2. 네트워크 보간 (다른 유저의 위치를 내 컴퓨터에서 부드럽게 맞춰줌)
                     if (!ent.isPlayer) {
                         if (!(ent.isBot && isHost && gameMode === 'private')) {
                             if (ent.targetX !== undefined) {
                                 ent.x += (ent.targetX - ent.x) * 0.15;
                                 ent.y += (ent.targetY - ent.y) * 0.15;
-                                ent.vx += ((ent.targetVx || 0) - ent.vx) * 0.15;
-                                ent.vz += ((ent.targetVz || 0) - ent.vz) * 0.15;
                             }
                         }
                     }
                 });
 
-                // 3. 내 좌표 네트워크 전송
+                // 3. 내 좌표 네트워크 전송 (방장이 죽어도 계속 서버로 쏘게 하여 관전자들에게 봇을 보여줌)
                 let syncRef = (gameMode === 'private') ? roomRef?.child('gameStates') : publicRoomRef?.child('gameStates');
-                if (syncRef && player && player.isAlive) {
+                if (syncRef) {
                     let now = Date.now();
                     if (now - lastNetworkSync > 50) {
                         lastNetworkSync = now;
                         let updates = {};
-                        updates[mySessionId] = { x: player.x, y: player.y, vx: player.vx, vz: player.vz, isAlive: player.isAlive };
+                        
+                        // 내가 살아있든 죽어있든 현재 내 상태를 전송
+                        if (player) {
+                            updates[mySessionId] = { x: player.x, y: player.y, vx: player.vx, vz: player.vz, isAlive: player.isAlive };
+                        }
+                        // 방장일 경우 봇들의 좌표도 무조건 지속적으로 푸시
                         if (gameMode === 'private' && isHost) {
                             entities.filter(e => e.isBot).forEach(bot => {
                                 updates[bot.id] = { x: bot.x, y: bot.y, vx: bot.vx, vz: bot.vz, isAlive: bot.isAlive };
                             });
                         }
-                        syncRef.update(updates);
+                        if (Object.keys(updates).length > 0) {
+                            syncRef.update(updates);
+                        }
                     }
                 }
 
-                // 4. 로컬 충돌 연산 (모든 클라이언트가 렉 없이 튕겨나감 연산)
+                // 4. 로컬 충돌 연산
                 for (let i = 0; i < entities.length; i++) {
                     for (let j = i + 1; j < entities.length; j++) {
                         let e1 = entities[i]; 
@@ -1197,7 +1226,7 @@ function gameLoop() {
                     }
                 }
 
-                // 5. 장외 링아웃 처리
+                // 5. 장외 탈락 처리
                 entities.forEach((ent, i) => {
                     if (!ent.isAlive) return; 
                     let dCenter = Math.sqrt(ent.x * ent.x + ent.y * ent.y);
@@ -1208,8 +1237,7 @@ function gameLoop() {
                                 ent.isDashing = false; ent.dashFrames = 0; ent.hasHit = false; ent.hasScoredHit = false;
                                 ent.isStunned = false; ent.stunTimer = 0; ent.staggerTimer = 0; ent.comboCount = 0; ent.comboTimer = 0; ent.isCooldown = false; ent.cooldownTimer = 0;
                             } else {
-                                // 다른 유저가 떨어지면 내 화면에서는 정지시키고 네트워크 좌표가 살려주길 기다림
-                                ent.vx = 0; ent.vz = 0;
+                                ent.vx = 0; ent.vz = 0; 
                             }
                         } else {
                             ent.isAlive = false; 
@@ -1463,7 +1491,7 @@ function showResults() {
         if (resultRoomInfo) resultRoomInfo.style.display = 'block'; 
         if (resultChatBox) resultChatBox.style.display = 'flex'; 
         if (resultRoomCode) resultRoomCode.innerText = currentRoomCode; 
-        if (replayBtn) replayBtn.style.display = isHost ? 'block' : 'none'; // 비방장은 다시하기 버튼 안보임
+        if (replayBtn) replayBtn.style.display = isHost ? 'block' : 'none';
     } else { 
         if (resultRoomInfo) resultRoomInfo.style.display = 'none'; 
         if (resultChatBox) resultChatBox.style.display = 'none'; 
